@@ -1,0 +1,1 @@
+window.IyasakaAuth=(function(){let admin=false;const PASS="iyasaka1234";function isAdmin(){return admin}function login(){const v=window.prompt("管理パスワードを入力してください");if(v===null)return false;if(v!==PASS){alert("パスワードが違います");return false}admin=true;return true}function logout(){admin=false}return{isAdmin,login,logout}})();
