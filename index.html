@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>彌榮四季の宝物</title>
+<meta name="theme-color" content="#6e8e59" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" />
+<link rel="icon" href="./icons/icon-192.png" />
+<link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body>
+<div class="app">
+  <div class="panel header">
+    <div class="header-top">
+      <div class="title"><h1>彌榮四季の宝物</h1><p>Supabase固定接続版 / ローカル保存なし</p></div>
+      <div class="header-actions admin-only hidden"><button class="btn primary" id="addBtn">＋ 記録</button></div>
+    </div>
+  </div>
+  <div class="panel toolbar">
+    <select class="select" id="yearSelect"></select>
+    <button class="btn soft" id="prevBtn">←</button>
+    <div class="month-title" id="monthTitle">4月</div>
+    <button class="btn soft" id="nextBtn">→</button>
+    <div class="spacer"></div>
+    <button class="btn soft" id="adminLoginBtn">管理用に入る</button>
+    <button class="btn soft admin-only hidden" id="adminLogoutBtn">管理を閉じる</button>
+  </div>
+  <div class="panel subbar">
+    <div class="picker-wrap">
+      <button type="button" id="filterTrigger" class="picker-trigger btn"><span class="picker-value" id="filterValue"></span><span>▾</span></button>
+      <div id="filterMenu" class="picker-menu"></div>
+    </div>
+    <select id="sortSelect" class="select">
+      <option value="start">開始日順</option><option value="category">カテゴリ順</option><option value="name">名前順</option>
+    </select>
+    <button class="btn soft admin-only hidden" id="manageCatsBtn">カテゴリ管理</button>
+    <div class="viewer-note" id="viewerNote">閲覧用：公開データを見る画面です。</div>
+  </div>
+  <div class="panel board" id="board">
+    <div class="board-head"><h2 id="monthHeadline">2026年4月</h2><div class="status" id="statusText">読み込み中…</div></div>
+    <div class="road-shell">
+      <div class="names-wrap"><div class="names-grid" id="nameGrid"></div></div>
+      <div class="days-wrap" id="wrap"><div class="gridline" id="roadmap"></div></div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div class="panel editor hidden" id="editor">
+    <div class="editor-head"><h3 id="editorTitle">新しく記録する</h3><div class="editor-tools"><button class="btn soft" id="toggleEditor">折りたたむ</button></div></div>
+    <div class="body" id="editorBody">
+      <div class="msg" id="formMsg"></div>
+      <div class="fields">
+        <div class="field full"><label for="name">たからもの名</label><input id="name" type="text" /></div>
+        <div class="field"><label for="start">開始日</label><input id="start" type="date" /></div>
+        <div class="field"><label for="end">終了日</label><input id="end" type="date" /></div>
+        <div class="field"><label for="category">カテゴリ</label><input id="category" type="hidden" /><div class="picker-wrap"><button type="button" id="categoryTrigger" class="picker-trigger btn"><span class="picker-value" id="categoryValue"></span><span>▾</span></button><div id="categoryMenu" class="picker-menu"></div></div></div>
+        <div class="field"><label>進行表の色</label><input id="color" type="hidden" value="rose" /><div class="picker-wrap"><button type="button" id="colorTrigger" class="picker-trigger btn"><span class="picker-value" id="colorValue"></span><span>▾</span></button><div id="colorMenu" class="picker-menu"></div></div></div>
+        <div class="field full"><label for="detail">詳細メモ</label><textarea id="detail"></textarea></div>
+      </div>
+    </div>
+    <div class="actions"><button class="btn soft" id="resetBtn">入力をリセット</button><button class="btn primary" id="saveBtn">保存する</button></div>
+  </div>
+</div>
+
+<div class="modal" id="detailModal"><div class="dialog"><div class="dhead"><div class="dleft"><div class="dtitle" id="detailTitle"></div><div class="meta" id="detailMeta"></div></div><div class="dtop"><button class="btn danger admin-only hidden" id="detailDelete">削除</button><button class="btn edit admin-only hidden" id="detailEdit">修正</button><button class="chipbtn" id="detailClose">閉じる</button></div></div><div class="dbody"><div class="photo" id="detailPhoto">画像なし</div><div class="note" id="detailNote"></div></div></div></div>
+<div class="confirm" id="confirmModal"><div class="cdialog"><div class="ctitle">本当に削除しますか</div><p class="ctext">この記録を削除します。元に戻せません。</p><div class="cactions"><button class="btn edit" id="confirmCancel">キャンセル</button><button class="btn danger" id="confirmDelete">削除する</button></div></div></div>
+<div class="catmodal" id="catModal"><div class="catdialog"><div class="dhead"><div class="dleft"><div class="dtitle" style="font-size:1.2rem">カテゴリ管理</div></div><div class="dtop"><button class="chipbtn" id="catClose">閉じる</button></div></div><section><h3>新規カテゴリ名登録</h3><div class="cat-form"><div class="field"><label for="catAddInput">新しいカテゴリ名</label><input id="catAddInput" type="text" /></div><div><button class="btn primary" id="catAddBtn">追加する</button></div></div></section><section><h3>カテゴリ一覧</h3><div class="cat-help">名称変更は、そのカテゴリを使っている記録すべてに一括反映されます。</div><div id="catList"></div></section></div></div>
+<div class="cataction" id="catActionModal"><div class="actdialog"><div class="ctitle" id="catActionTitle">カテゴリ操作</div><div class="cat-form" id="catActionBody"></div><div class="cactions"><button class="btn edit" id="catActionCancel">キャンセル</button><button class="btn primary" id="catActionSubmit">実行する</button></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./assets/supabase.js"></script>
+<script src="./assets/auth.js"></script>
+<script src="./assets/app.js"></script>
+</body></html>
