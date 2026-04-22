@@ -1,38 +1,23 @@
-# 彌榮四季の宝物 GitHub Pages版
+GitHub Pages用の正規分割版です。
 
-## そのまま置くファイル
+構成
 - index.html
 - manifest.webmanifest
 - assets/styles.css
-- assets/app.js
+- assets/auth.js
 - assets/supabase.js
-- icons/apple-touch-icon-180.png
-- icons/icon-192.png
-- icons/icon-512.png
-- icons/placeholder-400x300.png
+- assets/app.js
+- icons/...
 
-## GitHub Pages 公開手順
-1. このZIPを展開
-2. 中身をそのままリポジトリ直下へアップロード
-3. GitHub Pages を有効化
-4. 公開URLをSafariで開く
-5. 共有 → ホーム画面に追加
+使い方
+1. ZIPを展開
+2. このフォルダの中身をそのままGitHubリポジトリ直下に置く
+3. GitHub Pagesを有効化
+4. 初期表示は閲覧用
+5. 「管理用に入る」から管理パスワード入力で管理用へ
 
-## Supabase 側で必要なもの
-### Storage バケット
-- public バケット名: treasure-images など
+初期管理パスワード
+iyasaka1234
 
-### テーブル例
-- id text primary key
-- name text
-- start_date date
-- end_date date
-- category text
-- color text
-- detail text
-- image_url text
-- created_at timestamptz
-
-## 補足
-- 接続未設定のときはローカル体験版で動きます
-- 設定はブラウザの localStorage に保存されます
+注意
+静的サイトなので、管理パスワードはクライアント側の簡易認証です。

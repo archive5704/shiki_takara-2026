@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>彌榮四季の宝物</title>
+  <meta name="theme-color" content="#6e8e59" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="彌榮四季の宝物" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="panel header">
+      <div class="header-top">
+        <div class="title">
+          <h1>彌榮四季の宝物</h1>
+          <p>季節の食・気配・暮らしを発見。</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn soft viewer-only" id="adminLoginBtn">管理用に入る</button>
+          <button class="btn soft admin-only" id="configBtn">接続設定</button>
+          <button class="btn primary admin-only" id="addBtn">＋ 記録</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel toolbar">
+      <select class="select" id="yearSelect"></select>
+      <button class="btn soft" id="prevBtn">←</button>
+      <div class="month-title" id="monthTitle">4月</div>
+      <button class="btn soft" id="nextBtn">→</button>
+    </div>
+
+    <div class="panel subbar">
+      <div class="picker-wrap">
+        <button type="button" id="filterTrigger" class="picker-trigger btn">
+          <span class="picker-value" id="filterValue"></span><span>▾</span>
+        </button>
+        <div id="filterMenu" class="picker-menu"></div>
+      </div>
+      <select id="sortSelect" class="select">
+        <option value="start">開始日順</option>
+        <option value="category">カテゴリ順</option>
+        <option value="name">名前順</option>
+      </select>
+      <select id="modeSelect" class="select">
+        <option value="viewer">閲覧用</option>
+        <option value="admin">管理用</option>
+      </select>
+      <button class="btn soft admin-only" id="manageCatsBtn">カテゴリ管理</button>
+      <div class="viewer-note" id="viewerNote"></div>
+    </div>
+
+    <div class="panel board" id="board">
+      <div class="board-head">
+        <h2 id="monthHeadline">2026年4月</h2>
+        <div class="statusline" id="statusLine"></div>
+      </div>
+      <div class="road-shell">
+        <div class="names-wrap"><div class="names-grid" id="nameGrid"></div></div>
+        <div class="days-wrap" id="wrap"><div class="gridline" id="roadmap"></div></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="panel editor" id="editor">
+      <div class="editor-head">
+        <h3 id="editorTitle">新しく記録する</h3>
+        <div class="editor-tools"><button class="btn soft" id="toggleEditor">折りたたむ</button></div>
+      </div>
+      <div class="body" id="editorBody">
+        <div class="msg" id="formMsg"></div>
+        <div class="fields">
+          <div class="field full"><label for="name">たからもの名</label><input id="name" type="text" placeholder="例：ふきのとう" /></div>
+          <div class="field"><label for="start">開始日</label><input id="start" type="date" /></div>
+          <div class="field"><label for="end">終了日</label><input id="end" type="date" /></div>
+          <div class="field">
+            <label for="category">カテゴリ</label>
+            <input id="category" type="hidden" />
+            <div class="picker-wrap">
+              <button type="button" id="categoryTrigger" class="picker-trigger btn"><span class="picker-value" id="categoryValue"></span><span>▾</span></button>
+              <div id="categoryMenu" class="picker-menu"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>進行表の色</label>
+            <input id="color" type="hidden" value="rose" />
+            <div class="picker-wrap">
+              <button type="button" id="colorTrigger" class="picker-trigger btn"><span class="picker-value" id="colorValue"></span><span>▾</span></button>
+              <div id="colorMenu" class="picker-menu"></div>
+            </div>
+          </div>
+          <div class="field full admin-only">
+            <label for="imageFile">画像アップ</label>
+            <input id="imageFile" type="file" accept="image/*" />
+            <div class="hint">管理用だけ画像アップ可能。画像本体は Supabase Storage、記録データには image_url だけ保存します。</div>
+          </div>
+          <div class="field full admin-only">
+            <label>アップ画像プレビュー</label>
+            <div class="preview-card">
+              <img id="imagePreview" alt="プレビュー" src="./icons/placeholder-400x300.png" />
+              <div>
+                <div class="preview-empty" id="imagePreviewText">未選択</div>
+                <div class="image-actions" style="margin-top:8px"><button type="button" class="btn soft" id="clearImageBtn">画像をクリア</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="field full"><label for="detail">詳細メモ</label><textarea id="detail" placeholder="詳細を記録"></textarea></div>
+        </div>
+      </div>
+      <div class="actions admin-only"><button class="btn soft" id="resetBtn">入力をリセット</button><button class="btn primary" id="saveBtn">保存する</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="detailModal" aria-hidden="true">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="dhead">
+        <div class="dleft"><div class="dtitle" id="detailTitle"></div><div class="meta" id="detailMeta"></div></div>
+        <div class="dtop"><button class="btn danger admin-only" id="detailDelete">削除</button><button class="btn edit admin-only" id="detailEdit">修正</button><button class="chipbtn" id="detailClose">閉じる</button></div>
+      </div>
+      <div class="dbody">
+        <div class="photo-wrap">
+          <div class="photo" id="detailPhoto">画像なし</div>
+          <div class="image-actions admin-only"><button class="btn soft" id="detailRemoveImage">画像を外す</button></div>
+        </div>
+        <div><div class="note" id="detailNote"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm" id="confirmModal" aria-hidden="true">
+    <div class="cdialog" role="dialog" aria-modal="true">
+      <div class="ctitle">本当に削除しますか</div>
+      <p class="ctext">この記録を削除します。元に戻せません。</p>
+      <div class="cactions"><button class="btn edit" id="confirmCancel">キャンセル</button><button class="btn danger" id="confirmDelete">削除する</button></div>
+    </div>
+  </div>
+
+  <div class="catmodal" id="catModal" aria-hidden="true">
+    <div class="catdialog" role="dialog" aria-modal="true">
+      <div class="dhead">
+        <div class="dleft"><div class="dtitle" style="font-size:1.25rem">カテゴリ管理</div></div>
+        <div class="dtop"><button class="chipbtn" id="catClose">閉じる</button></div>
+      </div>
+      <section>
+        <h3>新規カテゴリ名登録</h3>
+        <div class="cat-form">
+          <div class="field"><label for="catAddInput">新しいカテゴリ名</label><input id="catAddInput" type="text" placeholder="例：行事" /></div>
+          <div><button class="btn primary" id="catAddBtn">追加する</button></div>
+        </div>
+      </section>
+      <section>
+        <h3>カテゴリ一覧</h3>
+        <div class="cat-help">名称変更は、そのカテゴリを使っている記録すべてに一括反映されます。</div>
+        <div id="catList"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="cataction" id="catActionModal" aria-hidden="true">
+    <div class="actdialog" role="dialog" aria-modal="true">
+      <div class="ctitle" id="catActionTitle">カテゴリ操作</div>
+      <div class="cat-form" id="catActionBody"></div>
+      <div class="cactions"><button class="btn edit" id="catActionCancel">キャンセル</button><button class="btn primary" id="catActionSubmit">実行する</button></div>
+    </div>
+  </div>
+
+  <div class="configmodal" id="configModal" aria-hidden="true">
+    <div class="cfgdialog" role="dialog" aria-modal="true">
+      <div class="dhead">
+        <div class="dleft"><div class="dtitle" style="font-size:1.25rem">接続設定</div></div>
+        <div class="dtop"><button class="chipbtn" id="configClose">閉じる</button></div>
+      </div>
+      <section>
+        <h3>Supabase</h3>
+        <div class="cfgform">
+          <div class="cfggrid">
+            <div class="field"><label for="supabaseUrl">Supabase URL</label><input id="supabaseUrl" class="mono" type="text" placeholder="https://xxxx.supabase.co" /></div>
+            <div class="field"><label for="supabaseAnonKey">Anon Key</label><input id="supabaseAnonKey" class="mono" type="password" placeholder="eyJ..." /></div>
+            <div class="field"><label for="bucketName">Storage バケット名</label><input id="bucketName" class="mono" type="text" placeholder="treasure-images" /></div>
+            <div class="field"><label for="tableName">記録テーブル名</label><input id="tableName" class="mono" type="text" placeholder="treasures" /></div>
+          </div>
+          <div class="cfghelp">閲覧専用ではこの接続設定は非表示です。管理用でのみ表示されます。</div>
+          <div class="cactions" style="justify-content:flex-start"><button class="btn primary" id="saveConfigBtn">設定を保存</button><button class="btn soft" id="testConfigBtn">接続確認</button><button class="btn soft" id="resetConfigBtn">ローカル体験版に戻す</button></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="authmodal" id="authModal" aria-hidden="true">
+    <div class="authdialog" role="dialog" aria-modal="true">
+      <div class="ctitle">管理用パスワード</div>
+      <p class="ctext">管理用へ入るにはパスワードが必要です。</p>
+      <div class="field"><label for="adminPasswordInput">パスワード</label><input id="adminPasswordInput" type="password" placeholder="パスワードを入力" /></div>
+      <div class="msg" id="authMsg"></div>
+      <div class="cactions"><button class="btn edit" id="authCancel">キャンセル</button><button class="btn primary" id="authSubmit">管理用に入る</button></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./assets/auth.js"></script>
+  <script src="./assets/supabase.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
