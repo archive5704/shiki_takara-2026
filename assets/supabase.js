@@ -60,11 +60,53 @@ window.ShikiSupabase=(function(){
     return true;
   }
   async function uploadImage(file,itemId){
-    const ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+    const s=getClient();
+    const sessionRes=await s.auth.getSession();
+    if(sessionRes.error)throw sessionRes.error;
+    const session=sessionRes.data.session;
+    if(!session||!session.access_token)throw new Error("管理者ログインのセッションが見つかりません。再ログインしてください。");
+
+    const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";
     const path="treasures/"+itemId+"-"+Date.now()+"."+ext;
-    const r=await getClient().storage.from(CONFIG.bucketName).upload(path,file,{upsert:false,cacheControl:"3600",contentType:file.type||"image/jpeg"});
-    if(r.error) throw r.error;
-    const pub=getClient().storage.from(CONFIG.bucketName).getPublicUrl(path);
+    const encodedPath=path.split("/").map(encodeURIComponent).join("/");
+    const url=CONFIG.url+"/storage/v1/object/"+encodeURIComponent(CONFIG.bucketName)+"/"+encodedPath;
+
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),60000);
+
+    let res;
+    try{
+      res=await fetch(url,{
+        method:"POST",
+        headers:{
+          "apikey":CONFIG.anonKey,
+          "Authorization":"Bearer "+session.access_token,
+          "Content-Type":file.type||"image/jpeg",
+          "Cache-Control":"3600",
+          "x-upsert":"false"
+        },
+        body:file,
+        signal:controller.signal
+      });
+    }catch(err){
+      clearTimeout(timer);
+      if(err.name==="AbortError")throw new Error("画像アップロードがタイムアウトしました。通信状況またはStorage設定をご確認ください。");
+      throw err;
+    }
+    clearTimeout(timer);
+
+    if(!res.ok){
+      let message="画像アップロードに失敗しました。";
+      try{
+        const data=await res.json();
+        message=data.message||data.error||JSON.stringify(data);
+      }catch(_e){
+        try{message=await res.text()}catch(_e2){}
+      }
+      throw new Error(message);
+    }
+
+    const pub=s.storage.from(CONFIG.bucketName).getPublicUrl(path);
     return pub.data.publicUrl;
   }
   return{CONFIG,getClient,fetchCategories,fetchTreasures,insertTreasure,updateTreasure,deleteTreasure,insertCategory,updateCategory,deleteCategory,moveTreasuresToCategory,uploadImage};
