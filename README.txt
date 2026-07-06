@@ -13,3 +13,4 @@
 1. sql/recovery_setup.sql を SQL Editor で実行
 2. ZIPの中身を GitHub リポジトリ直下に上書き
 3. シークレットウィンドウで確認
+再デプロイ 2026-07-06
