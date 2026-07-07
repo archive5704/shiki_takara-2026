@@ -1,0 +1,356 @@
+
+const MONTHS=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const COLORS=[{value:"rose",label:"さくら",color:"#f3cfd9",glyph:"#c06f8a"},{value:"peach",label:"もも",color:"#f7d9c7",glyph:"#c77f5d"},{value:"lemon",label:"たんぽぽ",color:"#f6ebbe",glyph:"#a5891f"},{value:"mint",label:"みどり",color:"#cfead7",glyph:"#4f8a63"},{value:"sky",label:"そら",color:"#cfe4f6",glyph:"#4d7ea8"},{value:"lavender",label:"ふじ",color:"#ddd7f6",glyph:"#7460b6"},{value:"sand",label:"きなり",color:"#eadfcd",glyph:"#8d7653"}];
+const $=id=>document.getElementById(id);
+const els={yearSelect:$("yearSelect"),prevBtn:$("prevBtn"),nextBtn:$("nextBtn"),addBtn:$("addBtn"),monthTitle:$("monthTitle"),monthHeadline:$("monthHeadline"),filterSelect:$("filterSelect"),sortSelect:$("sortSelect"),categoryManageBtn:$("categoryManageBtn"),viewerNote:$("viewerNote"),wrap:$("wrap"),nameGrid:$("nameGrid"),roadmap:$("roadmap"),legend:$("legend"),editor:$("editor"),editorTitle:$("editorTitle"),toggleEditor:$("toggleEditor"),resetBtn:$("resetBtn"),saveBtn:$("saveBtn"),formMsg:$("formMsg"),detailModal:$("detailModal"),detailTitle:$("detailTitle"),detailMeta:$("detailMeta"),detailPhoto:$("detailPhoto"),detailNote:$("detailNote"),detailClose:$("detailClose"),detailEdit:$("detailEdit"),detailDelete:$("detailDelete"),confirmModal:$("confirmModal"),confirmCancel:$("confirmCancel"),confirmDelete:$("confirmDelete"),loginModal:$("loginModal"),loginEmail:$("loginEmail"),loginPassword:$("loginPassword"),loginSubmit:$("loginSubmit"),loginCancel:$("loginCancel"),loginMsg:$("loginMsg"),categoryModal:$("categoryModal"),categoryClose:$("categoryClose"),newCategoryName:$("newCategoryName"),newCategorySort:$("newCategorySort"),newCategoryBtn:$("newCategoryBtn"),categoryList:$("categoryList"),categoryActionModal:$("categoryActionModal"),categoryActionTitle:$("categoryActionTitle"),categoryActionBody:$("categoryActionBody"),categoryActionCancel:$("categoryActionCancel"),categoryActionSubmit:$("categoryActionSubmit"),statusText:$("statusText"),loginOpenBtn:$("loginOpenBtn"),logoutBtn:$("logoutBtn"),imageFile:$("imageFile"),imagePreview:$("imagePreview"),removeImageBtn:$("removeImageBtn"),imageStatus:$("imageStatus"),colorPicker:$("colorPicker"),colorPickerButton:$("colorPickerButton"),colorPickerMenu:$("colorPickerMenu")};
+const form={name:$("name"),start:$("start"),end:$("end"),categorySelect:$("categorySelect"),colorSelect:$("colorSelect"),detail:$("detail")};
+let items=[],categories=[],currentYear=new Date().getFullYear(),currentMonth=new Date().getMonth()+1,activeCategory="all",activeSort="start",editingId=null,pendingDelete=null,pendingCategoryAction=null,currentImageUrl="",selectedImageFile=null,removeImageFlag=false;
+function makeId(){return crypto.randomUUID?crypto.randomUUID():"id_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10);}
+function esc(t){return String(t??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
+function escNl(t){return esc(t).replace(/\n/g,"<br>");}
+function fmt(v){if(!v)return"";const d=new Date(v+"T00:00:00");return Number.isNaN(d.getTime())?v:(d.getMonth()+1)+"/"+d.getDate();}
+function fmtFull(v){if(!v)return"";const d=new Date(v+"T00:00:00");return Number.isNaN(d.getTime())?v:d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate();}
+function daysInMonth(y,m){return new Date(y,m,0).getDate();}
+function diffDays(a,b){return Math.floor((b.getTime()-a.getTime())/86400000);}
+function getColor(v){return COLORS.find(c=>c.value===v)||COLORS[0];}
+function selectedMonthDate(){
+  return currentYear+"-"+String(currentMonth).padStart(2,"0")+"-01";
+}
+function renderColorPalette(){
+  if(!els.colorPickerButton||!els.colorPickerMenu)return;
+
+  els.colorPickerMenu.innerHTML="";
+
+  COLORS.forEach(c=>{
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="color-picker-option";
+    btn.dataset.value=c.value;
+    btn.setAttribute("role","option");
+    btn.innerHTML='<span class="color-option-swatch" style="background:'+c.color+'"></span><span>'+esc(c.label)+'</span>';
+    btn.onclick=()=>{
+      form.colorSelect.value=c.value;
+      updateColorPaletteSelection();
+      closeColorPicker();
+    };
+    els.colorPickerMenu.appendChild(btn);
+  });
+
+  updateColorPaletteSelection();
+}
+
+function updateColorPaletteSelection(){
+  if(!els.colorPickerButton||!els.colorPickerMenu)return;
+
+  const selected=getColor(form.colorSelect.value);
+  els.colorPickerButton.innerHTML='<span class="color-option-swatch" style="background:'+selected.color+'"></span><span>'+esc(selected.label)+'</span>';
+
+  els.colorPickerMenu.querySelectorAll(".color-picker-option").forEach(btn=>{
+    const active=btn.dataset.value===form.colorSelect.value;
+    btn.classList.toggle("active",active);
+    btn.setAttribute("aria-selected",active?"true":"false");
+  });
+}
+
+function openColorPicker(){
+  if(!els.colorPicker)return;
+  els.colorPicker.classList.add("open");
+  els.colorPickerButton.setAttribute("aria-expanded","true");
+}
+
+function closeColorPicker(){
+  if(!els.colorPicker)return;
+  els.colorPicker.classList.remove("open");
+  els.colorPickerButton.setAttribute("aria-expanded","false");
+}
+
+function toggleColorPicker(){
+  if(!els.colorPicker)return;
+  if(els.colorPicker.classList.contains("open"))closeColorPicker();
+  else openColorPicker();
+}
+
+function categoryName(id){const c=categories.find(x=>x.id===id);return c?c.name:"";}
+function isSansai(item){return categoryName(item.category_id)==="山菜";}
+function mountainGlyph(item,d){if(!isSansai(item))return"";const n=diffDays(new Date(item.start+"T00:00:00"),d);return n<0?"":n<7?"◎":n<14?"○":"△";}
+function visible(item,y,m){const ms=new Date(y,m-1,1),me=new Date(y,m-1,daysInMonth(y,m)),s=new Date(item.start+"T00:00:00"),e=new Date(item.end+"T00:00:00");if(e<ms||s>me)return null;return{start:s<ms?1:s.getDate(),end:e>me?me.getDate():e.getDate()};}
+function monthItems(){const ms=new Date(currentYear,currentMonth-1,1),me=new Date(currentYear,currentMonth-1,daysInMonth(currentYear,currentMonth));const list=items.filter(i=>{if(activeCategory!=="all"&&i.category_id!==activeCategory)return false;const s=new Date(i.start+"T00:00:00"),e=new Date(i.end+"T00:00:00");return !(e<ms||s>me);});list.sort((a,b)=>activeSort==="category"?(categoryName(a.category_id)+"_"+a.start).localeCompare(categoryName(b.category_id)+"_"+b.start,"ja"):activeSort==="name"?a.name.localeCompare(b.name,"ja"):a.start.localeCompare(b.start,"ja"));return list;}
+function renderSelects(){
+  els.filterSelect.innerHTML="";
+  const all=document.createElement("option");
+  all.value="all";
+  all.textContent="すべて";
+  all.selected=activeCategory==="all";
+  els.filterSelect.appendChild(all);
+
+  categories.forEach(c=>{
+    const o=document.createElement("option");
+    o.value=c.id;
+    o.textContent=c.name;
+    o.selected=activeCategory===c.id;
+    els.filterSelect.appendChild(o);
+  });
+
+  form.categorySelect.innerHTML="";
+  categories.forEach(c=>{
+    const o=document.createElement("option");
+    o.value=c.id;
+    o.textContent=c.name;
+    form.categorySelect.appendChild(o);
+  });
+
+  form.colorSelect.innerHTML="";
+  COLORS.forEach(c=>{
+    const o=document.createElement("option");
+    o.value=c.value;
+    o.textContent=c.label;
+    form.colorSelect.appendChild(o);
+  });
+
+  renderColorPalette();
+}
+function renderYears(){els.yearSelect.innerHTML="";const ys=new Set([currentYear,currentYear-1,currentYear+1]);items.forEach(i=>{ys.add(Number(i.start.slice(0,4)));ys.add(Number(i.end.slice(0,4)));});Array.from(ys).filter(Number.isFinite).sort((a,b)=>a-b).forEach(y=>{const o=document.createElement("option");o.value=String(y);o.textContent=String(y);if(y===currentYear)o.selected=true;els.yearSelect.appendChild(o);});}
+function renderLegend(show){els.legend.innerHTML=show?'<span><span>◎</span>最初の7日</span><span><span>○</span>次の7日</span><span><span>△</span>それ以降</span>':"";}
+function renderRoadmap(){const list=monthItems(),d=daysInMonth(currentYear,currentMonth),today=new Date(),todayDay=(today.getFullYear()===currentYear&&today.getMonth()+1===currentMonth)?today.getDate():0;els.monthTitle.textContent=MONTHS[currentMonth-1];els.monthHeadline.textContent=currentYear+"年"+MONTHS[currentMonth-1];els.roadmap.style.setProperty("--days",String(d));els.roadmap.innerHTML="";els.nameGrid.innerHTML="";const nh=document.createElement("div");nh.className="name-row head";nh.innerHTML='<div class="name">たからもの</div>';els.nameGrid.appendChild(nh);const dh=document.createElement("div");dh.className="day-row head";const dds=document.createElement("div");dds.className="days";for(let i=1;i<=d;i++){const c=document.createElement("div");c.className="hcell"+(i===todayDay?" today":"");c.textContent=String(i);dds.appendChild(c);}dh.appendChild(dds);els.roadmap.appendChild(dh);if(!list.length){const e=document.createElement("div");e.className="empty";e.textContent="まだ記録がありません。";els.roadmap.appendChild(e);renderLegend(false);return;}renderLegend(list.some(isSansai));list.forEach(item=>{const nr=document.createElement("div");nr.className="name-row";const n=document.createElement("div");n.className="name clickable";n.innerHTML=`<div class="item"><strong>${esc(item.name)}</strong><small>${esc(categoryName(item.category_id))} / ${esc(fmt(item.start))}〜${esc(fmt(item.end))}</small></div>`;n.onclick=()=>openDetail(item);nr.appendChild(n);els.nameGrid.appendChild(nr);const dr=document.createElement("div");dr.className="day-row";const ds=document.createElement("div");ds.className="days";const range=visible(item,currentYear,currentMonth);for(let i=1;i<=d;i++){const c=document.createElement("div");c.className="cell"+(i===todayDay?" today":"");if(range&&i>=range.start&&i<=range.end){const m=document.createElement("div");if(isSansai(item)){m.className="mark mountain";m.style.color=getColor(item.color).glyph;m.textContent=mountainGlyph(item,new Date(currentYear,currentMonth-1,i));}else{m.className="mark";m.style.background=getColor(item.color).color;}c.appendChild(m);}ds.appendChild(c);}dr.appendChild(ds);els.roadmap.appendChild(dr);});}
+function renderAll(){renderYears();renderSelects();renderRoadmap();}
+function showMsg(t){els.formMsg.textContent=t;els.formMsg.classList.add("show");}
+function clearMsg(){els.formMsg.textContent="";els.formMsg.classList.remove("show");}
+function showLoginMsg(t){els.loginMsg.textContent=t;els.loginMsg.classList.add("show");}
+function clearLoginMsg(){els.loginMsg.textContent="";els.loginMsg.classList.remove("show");}
+function setPreview(url){els.imagePreview.innerHTML=url?`<img src="${url}" alt="preview">`:"画像なし";}
+function setImageStatus(t){els.imageStatus.textContent=t||"";}
+function resetImage(){currentImageUrl="";selectedImageFile=null;removeImageFlag=false;if(els.imageFile)els.imageFile.value="";setPreview("");setImageStatus("管理用のみ画像アップできます。");}
+function startNew(){
+  editingId=null;
+  els.editorTitle.textContent="新しく記録する";
+  els.saveBtn.textContent="保存する";
+  clearMsg();
+  form.name.value="";
+  const monthDate=selectedMonthDate();
+  form.start.value=monthDate;
+  form.end.value=monthDate;
+  form.categorySelect.value=categories[0]?.id||"";
+  form.colorSelect.value=COLORS[0].value;
+  form.detail.value="";
+  updateColorPaletteSelection();
+  resetImage();
+}
+function fillForm(item){
+  editingId=item.id;
+  els.editorTitle.textContent="記録を修正する";
+  els.saveBtn.textContent="修正を保存";
+  clearMsg();
+  form.name.value=item.name||"";
+  form.start.value=item.start||"";
+  form.end.value=item.end||"";
+  form.categorySelect.value=item.category_id||"";
+  form.colorSelect.value=item.color||COLORS[0].value;
+  updateColorPaletteSelection();
+  form.detail.value=item.detail||"";
+  currentImageUrl=item.image_url||"";
+  selectedImageFile=null;
+  removeImageFlag=false;
+  if(els.imageFile)els.imageFile.value="";
+  setPreview(currentImageUrl);
+  setImageStatus(currentImageUrl?"現在の画像を使用中":"画像なし");
+  if(els.editor.classList.contains("collapsed"))toggleEditor(true);
+}
+async function reloadAll(){els.statusText.textContent="読み込み中…";try{const [cats,trs]=await Promise.all([AppDB.fetchCategories(),AppDB.fetchTreasures()]);categories=cats.map(c=>({id:c.id,name:c.name||"",sort_order:Number(c.sort_order||0)}));items=trs.map(t=>({id:t.id,name:t.name||"",start:t.start_date||"",end:t.end_date||"",category_id:t.category_id||"",color:t.color||"rose",detail:t.detail||"",image_url:t.image_url||""}));renderAll();els.statusText.textContent=items.length+"件を表示中";}catch(err){console.error(err);els.statusText.textContent=err.message||"読み込みに失敗しました。";renderAll();}}
+async function save(){clearMsg();if(!AppAuth.isAdmin())return showMsg("管理者ログインが必要です。");const isEdit=!!editingId;const payload={id:isEdit?editingId:makeId(),name:form.name.value.trim(),start:form.start.value,end:form.end.value,category_id:form.categorySelect.value,color:form.colorSelect.value,detail:form.detail.value.trim(),image_url:currentImageUrl||""};if(!payload.name)return showMsg("たからもの名が未入力の為、保存できません。");if(!payload.start||!payload.end)return showMsg("開始日または終了日が未入力の為、保存できません。");if(!payload.category_id)return showMsg("カテゴリが未設定の為、保存できません。");if(payload.end<payload.start)return showMsg("開始日より、終了日が前の為、保存できません。");try{if(removeImageFlag)payload.image_url="";if(selectedImageFile){setImageStatus("画像をアップロード中…");const up=AppDB.uploadImage(selectedImageFile,payload.id);const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("画像アップロードがタイムアウトしました。")),60000));payload.image_url=await Promise.race([up,timeout]);setImageStatus("画像をアップロードしました。");}const row={id:payload.id,name:payload.name,start_date:payload.start,end_date:payload.end,category_id:payload.category_id,color:payload.color,detail:payload.detail,image_url:payload.image_url||""};if(isEdit)await AppDB.updateTreasure(editingId,{name:row.name,start_date:row.start_date,end_date:row.end_date,category_id:row.category_id,color:row.color,detail:row.detail,image_url:row.image_url});else await AppDB.insertTreasure(row);currentYear=Number(payload.start.slice(0,4));currentMonth=Number(payload.start.slice(5,7));await reloadAll();startNew();}catch(err){setImageStatus(err.message||"画像アップロードに失敗しました。");showMsg(err.message||"保存に失敗しました。");}}
+function openDetail(item){els.detailTitle.textContent=item.name||"";els.detailMeta.innerHTML=`<span class="chip">カテゴリ ${esc(categoryName(item.category_id))}</span><span class="chip">${esc(fmtFull(item.start))}〜${esc(fmtFull(item.end))}</span>`;els.detailNote.innerHTML=item.detail?escNl(item.detail):"メモなし";els.detailPhoto.innerHTML=item.image_url?`<img src="${item.image_url}" alt="detail">`:"画像なし";els.detailEdit.onclick=()=>{closeDetail();fillForm(item);scrollToEditor();};els.detailDelete.onclick=()=>{pendingDelete=item;els.confirmModal.classList.add("open");};els.detailModal.classList.add("open");}
+function closeDetail(){els.detailModal.classList.remove("open");}
+function closeConfirm(){els.confirmModal.classList.remove("open");pendingDelete=null;}
+async function deletePending(){if(!pendingDelete)return;try{await AppDB.deleteTreasure(pendingDelete.id);closeConfirm();closeDetail();await reloadAll();}catch(err){alert(err.message||"削除に失敗しました。");}}
+function renderCategoryList(){els.categoryList.innerHTML="";categories.forEach(cat=>{const row=document.createElement("div");row.className="cat-row";const name=document.createElement("div");name.className="cat-name";name.innerHTML=`<strong>${esc(cat.name)}</strong><div class="cat-sort">並び順: ${esc(String(cat.sort_order??0))}</div>`;const edit=document.createElement("button");edit.className="btn";edit.textContent="名称変更";edit.onclick=()=>openRenameCategory(cat);const del=document.createElement("button");del.className="btn danger";del.textContent="削除";del.onclick=()=>openDeleteCategory(cat);row.append(name,edit,del);els.categoryList.appendChild(row);});}
+function openCategoryModal(){renderCategoryList();els.categoryModal.classList.add("open");}
+function closeCategoryModal(){els.categoryModal.classList.remove("open");}
+async function addCategory(){
+  const name=els.newCategoryName.value.trim();
+  const sort_order=Number(els.newCategorySort.value||0);
+
+  if(!name){
+    alert("カテゴリ名を入力してください。");
+    return;
+  }
+  if(!AppAuth.isAdmin()){
+    alert("管理者ログインが必要です。");
+    return;
+  }
+  if(categories.some(c=>c.name===name)){
+    alert("同じ名前のカテゴリが既にあります");
+    return;
+  }
+
+  const originalText=els.newCategoryBtn.textContent;
+  els.newCategoryBtn.disabled=true;
+  els.newCategoryBtn.textContent="追加中…";
+
+  try{
+    await AppDB.insertCategory(name,sort_order);
+    els.newCategoryName.value="";
+    els.newCategorySort.value="";
+    await reloadAll();
+    renderCategoryList();
+
+    const added=categories.find(c=>c.name===name);
+    if(added){
+      form.categorySelect.value=added.id;
+    }
+  }catch(err){
+    console.error("category insert failed",err);
+    alert(err.message||"カテゴリ追加に失敗しました。");
+  }finally{
+    els.newCategoryBtn.disabled=false;
+    els.newCategoryBtn.textContent=originalText;
+  }
+}
+function closeCategoryAction(){els.categoryActionModal.classList.remove("open");pendingCategoryAction=null;}
+function openRenameCategory(cat){pendingCategoryAction={type:"rename",cat};els.categoryActionTitle.textContent="カテゴリ名変更";els.categoryActionBody.innerHTML=`<div class="field"><label>新しいカテゴリ名</label><input id="catRenameInput" value="${esc(cat.name)}"></div><div class="field"><label>並び順</label><input id="catRenameSort" type="number" value="${esc(String(cat.sort_order??0))}"></div>`;els.categoryActionSubmit.className="btn primary";els.categoryActionSubmit.textContent="変更する";els.categoryActionModal.classList.add("open");}
+function openDeleteCategory(cat){pendingCategoryAction={type:"delete",cat};const opts=categories.filter(c=>c.id!==cat.id).map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");els.categoryActionTitle.textContent="カテゴリ削除";els.categoryActionBody.innerHTML=`<div class="field"><label>削除するカテゴリ</label><input value="${esc(cat.name)}" disabled></div><div class="field"><label>記録の移動先</label><select id="moveToCategory" class="select">${opts}</select></div>`;els.categoryActionSubmit.className="btn danger";els.categoryActionSubmit.textContent="削除する";els.categoryActionModal.classList.add("open");}
+async function submitCategoryAction(){if(!pendingCategoryAction)return;try{if(pendingCategoryAction.type==="rename"){const name=$("catRenameInput").value.trim();const sort_order=Number($("catRenameSort").value||0);if(!name)return alert("カテゴリ名を入力してください");await AppDB.updateCategory(pendingCategoryAction.cat.id,{name,sort_order});}else{const moveTo=$("moveToCategory").value;if(!moveTo)return alert("移動先カテゴリを選んでください");await AppDB.moveTreasuresToCategory(pendingCategoryAction.cat.id,moveTo);await AppDB.deleteCategory(pendingCategoryAction.cat.id);}closeCategoryAction();await reloadAll();renderCategoryList();}catch(err){alert(err.message||"カテゴリ操作に失敗しました。");}}
+function toggleEditor(force){const open=force===undefined?els.editor.classList.contains("collapsed"):force;els.editor.classList.toggle("collapsed",!open);els.toggleEditor.textContent=open?"折りたたむ":"開く";}
+function goPrevMonth(){
+  if(currentMonth===1){
+    currentMonth=12;
+    currentYear--;
+  }else{
+    currentMonth--;
+  }
+  renderYears();
+  renderRoadmap();
+}
+
+function goNextMonth(){
+  if(currentMonth===12){
+    currentMonth=1;
+    currentYear++;
+  }else{
+    currentMonth++;
+  }
+  renderYears();
+  renderRoadmap();
+}
+
+function scrollToEditor(){
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      els.editor.scrollIntoView({
+        behavior:"smooth",
+        block:"start"
+      });
+    },60);
+  });
+}
+
+function setupMonthSwipe(){
+  const target=document.querySelector(".board");
+  if(!target)return;
+
+  let startX=0;
+  let startY=0;
+  let startTime=0;
+  let tracking=false;
+
+  target.addEventListener("touchstart",e=>{
+    // 日付グリッド上の横スワイプは、月移動に使わない
+    // 日付部分では従来どおり横スクロールだけを許可する
+    if(e.target.closest(".days-wrap")){
+      tracking=false;
+      return;
+    }
+
+    if(e.touches.length!==1){
+      tracking=false;
+      return;
+    }
+
+    const t=e.touches[0];
+    startX=t.clientX;
+    startY=t.clientY;
+    startTime=Date.now();
+    tracking=true;
+  },{passive:true});
+
+  target.addEventListener("touchend",e=>{
+    if(!tracking||!e.changedTouches.length)return;
+
+    const t=e.changedTouches[0];
+    const dx=t.clientX-startX;
+    const dy=t.clientY-startY;
+    const elapsed=Date.now()-startTime;
+
+    tracking=false;
+
+    const horizontal=Math.abs(dx);
+    const vertical=Math.abs(dy);
+
+    // 誤操作防止：短すぎる動き、縦スクロール、ゆっくり過ぎる操作は無視
+    if(horizontal<55)return;
+    if(horizontal<=vertical*1.15)return;
+    if(elapsed>900)return;
+
+    // 右スワイプ → 前月、左スワイプ → 翌月
+    if(dx>0)goPrevMonth();
+    else goNextMonth();
+  },{passive:true});
+
+  target.addEventListener("touchcancel",()=>{
+    tracking=false;
+  },{passive:true});
+}
+
+function openLogin(){clearLoginMsg();els.loginEmail.value="";els.loginPassword.value="";els.loginModal.classList.add("open");}
+function closeLogin(){els.loginModal.classList.remove("open");}
+function clearLoginMsg(){els.loginMsg.textContent="";els.loginMsg.classList.remove("show");}
+function showLoginMsg(t){els.loginMsg.textContent=t;els.loginMsg.classList.add("show");}
+function applyAdminState(){const viewer=!AppAuth.isAdmin();document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("hidden",viewer));els.editor.classList.toggle("hidden",viewer);els.loginOpenBtn.classList.toggle("hidden",!viewer);els.logoutBtn.classList.toggle("hidden",viewer);els.viewerNote.textContent=viewer?"閲覧用：公開データを見る画面です。":"管理用：Supabaseに保存できます。";if(viewer){closeDetail();closeConfirm();closeCategoryModal();closeCategoryAction();}}
+els.prevBtn.onclick=goPrevMonth;
+els.nextBtn.onclick=goNextMonth;
+els.yearSelect.onchange=()=>{currentYear=Number(els.yearSelect.value);renderRoadmap();};
+els.filterSelect.onchange=()=>{activeCategory=els.filterSelect.value;renderRoadmap();};
+els.sortSelect.onchange=()=>{activeSort=els.sortSelect.value;renderRoadmap();};
+form.colorSelect.onchange=updateColorPaletteSelection;
+els.colorPickerButton.onclick=(e)=>{e.stopPropagation();toggleColorPicker();};
+els.colorPickerMenu.onclick=(e)=>e.stopPropagation();
+document.addEventListener("click",closeColorPicker);
+els.addBtn.onclick=()=>{startNew();if(els.editor.classList.contains("collapsed"))toggleEditor(true);scrollToEditor();};
+els.toggleEditor.onclick=()=>toggleEditor();
+els.saveBtn.onclick=save;
+els.resetBtn.onclick=startNew;
+els.detailClose.onclick=closeDetail;
+els.detailModal.onclick=e=>{if(e.target===els.detailModal)closeDetail();};
+els.confirmCancel.onclick=closeConfirm;
+els.confirmDelete.onclick=deletePending;
+els.confirmModal.onclick=e=>{if(e.target===els.confirmModal)closeConfirm();};
+els.categoryManageBtn.onclick=openCategoryModal;
+els.categoryClose.onclick=closeCategoryModal;
+els.categoryModal.onclick=e=>{if(e.target===els.categoryModal)closeCategoryModal();};
+els.newCategoryBtn.onclick=addCategory;
+els.categoryActionCancel.onclick=closeCategoryAction;
+els.categoryActionSubmit.onclick=submitCategoryAction;
+els.categoryActionModal.onclick=e=>{if(e.target===els.categoryActionModal)closeCategoryAction();};
+els.wrap.addEventListener("scroll",()=>{els.nameGrid.scrollTop=els.wrap.scrollTop;});
+els.loginOpenBtn.onclick=openLogin;
+els.logoutBtn.onclick=async()=>{
+  const originalText=els.logoutBtn.textContent;
+  els.logoutBtn.disabled=true;
+  els.logoutBtn.textContent="ログアウト中…";
+  try{
+    await AppAuth.signOut();
+    applyAdminState();
+  }catch(err){
+    console.error("logout failed",err);
+    alert(err.message||"ログアウトに失敗しました。");
+  }finally{
+    els.logoutBtn.disabled=false;
+    els.logoutBtn.textContent=originalText;
+  }
+};
+els.loginCancel.onclick=closeLogin;
+els.loginModal.onclick=e=>{if(e.target===els.loginModal)closeLogin();};
+els.loginSubmit.onclick=async()=>{clearLoginMsg();try{await AppAuth.signIn(els.loginEmail.value.trim(),els.loginPassword.value);closeLogin();applyAdminState();}catch(err){showLoginMsg(err.message||"ログインに失敗しました。");}};
+els.imageFile.onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f){selectedImageFile=null;return;}selectedImageFile=f;removeImageFlag=false;setPreview(URL.createObjectURL(f));setImageStatus("新しい画像を選択しました。保存で反映されます。");};
+els.removeImageBtn.onclick=()=>{selectedImageFile=null;removeImageFlag=true;currentImageUrl="";if(els.imageFile)els.imageFile.value="";setPreview("");setImageStatus("画像を外します。保存で反映されます。");};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(els.colorPicker&&els.colorPicker.classList.contains("open"))closeColorPicker();else if(els.loginModal.classList.contains("open"))closeLogin();else if(els.confirmModal.classList.contains("open"))closeConfirm();else if(els.categoryActionModal.classList.contains("open"))closeCategoryAction();else if(els.categoryModal.classList.contains("open"))closeCategoryModal();else if(els.detailModal.classList.contains("open"))closeDetail();}});
+document.addEventListener("app-auth-changed",applyAdminState);
+(async function boot(){await AppAuth.init();applyAdminState();renderSelects();startNew();setupMonthSwipe();await reloadAll();})();
